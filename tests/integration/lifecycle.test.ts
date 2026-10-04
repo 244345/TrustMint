@@ -31,6 +31,11 @@ const rpcServer = new rpc.Server(RPC_URL, { allowHttp: true });
 const admin = Keypair.random();
 const FRIENDBOT_URL = new URL("/friendbot", RPC_URL);
 
+function contractAddress(contractId: string): xdr.ScVal {
+  const rawContractId = Buffer.from(contractId, "hex") as unknown as xdr.ContractId;
+  return xdr.ScVal.scvAddress(xdr.ScAddress.scAddressTypeContract(rawContractId));
+}
+
 beforeAll(async () => {
   const response = await fetch(
     `${FRIENDBOT_URL}?addr=${encodeURIComponent(admin.publicKey())}`
@@ -71,13 +76,8 @@ async function uploadWasm(keypair: Keypair, wasmPath: string): Promise<string> {
     throw new Error(`Upload failed: ${JSON.stringify(getResult)}`);
   }
   const meta = getResult.resultMetaXdr;
-  const parsed = xdr.TransactionMeta.fromXDR(meta, "base64");
-  const wasmHash = parsed
-    .v3()
-    .sorobanMeta()
-    ?.returnValue()
-    .bytes()
-    .toString("hex");
+  const sorobanMeta = meta.switch() === 4 ? meta.v4().sorobanMeta() : meta.v3().sorobanMeta();
+  const wasmHash = sorobanMeta && Buffer.from(sorobanMeta.returnValue().bytes()).toString("hex");
   if (!wasmHash) throw new Error("No wasm hash returned");
   return wasmHash;
 }
@@ -120,16 +120,11 @@ async function deployContract(
     throw new Error(`Deploy failed: ${JSON.stringify(getResult)}`);
   }
   const meta = getResult.resultMetaXdr;
-  const parsed = xdr.TransactionMeta.fromXDR(meta, "base64");
-  const contractId = parsed
-    .v3()
-    .sorobanMeta()
-    ?.returnValue()
-    .address()
-    .contractId()
-    .toString("hex");
+  const sorobanMeta =
+    meta.switch() === 4 ? meta.v4().sorobanMeta() : meta.v3().sorobanMeta();
+  const contractId = sorobanMeta?.returnValue().address().contractId();
   if (!contractId) throw new Error("No contract ID returned");
-  return contractId;
+  return Buffer.from(contractId as unknown as Uint8Array).toString("hex");
 }
 
 async function invokeContract(
@@ -163,8 +158,9 @@ async function invokeContract(
     throw new Error(`Invoke ${method} failed: ${JSON.stringify(getResult)}`);
   }
   const meta = getResult.resultMetaXdr;
-  const parsed = xdr.TransactionMeta.fromXDR(meta, "base64");
-  return parsed.v3().sorobanMeta()!.returnValue();
+  const sorobanMeta = meta.switch() === 4 ? meta.v4().sorobanMeta() : meta.v3().sorobanMeta();
+  if (!sorobanMeta) throw new Error("No Soroban metadata returned");
+  return sorobanMeta.returnValue();
 }
 
 // ── Test suite ────────────────────────────────────────────────────────────────
@@ -232,9 +228,7 @@ describe("Compliance Engine lifecycle", () => {
       admin,
       path.join(WASM_DIR, "compliance_engine.wasm")
     );
-    const kycAddr = xdr.ScVal.scvAddress(
-      xdr.ScAddress.scAddressTypeContract(Buffer.from(kycContractId, "hex"))
-    );
+    const kycAddr = contractAddress(kycContractId);
     ceContractId = await deployContract(admin, ceHash, [adminAddr, kycAddr]);
   });
 
@@ -262,7 +256,7 @@ describe("Compliance Engine lifecycle", () => {
       toAddr,
       amount,
     ]);
-    expect(result.bool()).toBe(true);
+    expect(result.b()).toBe(true);
   });
 
   it("pause blocks all transfers", async () => {
@@ -289,7 +283,7 @@ describe("Compliance Engine lifecycle", () => {
       toAddr,
       amount,
     ]);
-    expect(result.bool()).toBe(false);
+    expect(result.b()).toBe(false);
 
     await invokeContract(admin, ceContractId, "unpause", []);
   });
@@ -320,24 +314,18 @@ describe("RWA Token lifecycle", () => {
     await invokeContract(admin, kycContractId, "add_verifier", [verifierAddr]);
 
     const ceHash = await uploadWasm(admin, path.join(WASM_DIR, "compliance_engine.wasm"));
-    const kycAddr = xdr.ScVal.scvAddress(
-      xdr.ScAddress.scAddressTypeContract(Buffer.from(kycContractId, "hex"))
-    );
+    const kycAddr = contractAddress(kycContractId);
     ceContractId = await deployContract(admin, ceHash, [adminAddr, kycAddr]);
 
     const rwaHash = await uploadWasm(admin, path.join(WASM_DIR, "rwa_token.wasm"));
-    const ceAddr = xdr.ScVal.scvAddress(
-      xdr.ScAddress.scAddressTypeContract(Buffer.from(ceContractId, "hex"))
-    );
+    const ceAddr = contractAddress(ceContractId);
     rwaContractId = await deployContract(admin, rwaHash, [
       adminAddr,
       xdr.ScVal.scvU32(7),
       xdr.ScVal.scvString("TrustMint RWA"),
       xdr.ScVal.scvString("VTRWA"),
       xdr.ScVal.scvString("property"),
-      xdr.ScVal.scvAddress(
-        xdr.ScAddress.scAddressTypeContract(Buffer.from(kycContractId, "hex"))
-      ),
+      contractAddress(kycContractId),
       ceAddr,
       xdr.ScVal.scvVoid(),
     ]);
@@ -366,18 +354,14 @@ describe("Invoice Token multi-invoice lifecycle", () => {
     kycContractId = await deployContract(admin, kycHash, [adminAddr]);
 
     const ceHash = await uploadWasm(admin, path.join(WASM_DIR, "compliance_engine.wasm"));
-    const kycAddr = xdr.ScVal.scvAddress(
-      xdr.ScAddress.scAddressTypeContract(Buffer.from(kycContractId, "hex"))
-    );
+    const kycAddr = contractAddress(kycContractId);
     ceContractId = await deployContract(admin, ceHash, [adminAddr, kycAddr]);
 
     const invoiceHash = await uploadWasm(
       admin,
       path.join(WASM_DIR, "invoice_token.wasm")
     );
-    const ceAddr = xdr.ScVal.scvAddress(
-      xdr.ScAddress.scAddressTypeContract(Buffer.from(ceContractId, "hex"))
-    );
+    const ceAddr = contractAddress(ceContractId);
 
     const initialMeta = xdr.ScVal.scvMap([
       new xdr.ScMapEntry({
@@ -429,9 +413,7 @@ describe("Invoice Token multi-invoice lifecycle", () => {
 
     invoiceContractId = await deployContract(admin, invoiceHash, [
       adminAddr,
-      xdr.ScVal.scvAddress(
-        xdr.ScAddress.scAddressTypeContract(Buffer.from(kycContractId, "hex"))
-      ),
+      contractAddress(kycContractId),
       ceAddr,
       initialMeta,
     ]);

@@ -143,12 +143,15 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: tests/integration/package-lock.json
       - name: Install integration test dependencies
         working-directory: tests/integration
         run: npm ci
+      - name: Type-check integration tests
+        working-directory: tests/integration
+        run: npm run typecheck
       - name: Run integration tests
         working-directory: tests/integration
         run: npm test
