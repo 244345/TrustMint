@@ -4,7 +4,7 @@
  * Prerequisites:
  *   - A Stellar standalone node running on http://localhost:8000
  *     (start via `docker-compose up -d` from the repo root)
- *   - WASM binaries built under target/wasm32-unknown-unknown/release/
+ *   - WASM binaries built under target/wasm32v1-none/release/
  *
  * Run: npm test
  */
@@ -28,11 +28,19 @@ const NETWORK_PASSPHRASE = Networks.STANDALONE;
 
 const rpcServer = new rpc.Server(RPC_URL, { allowHttp: true });
 
-// Public standalone-network root seed for local Quickstart only. Never use this
-// key on a public network or for real funds.
-const admin = Keypair.fromSecret(
-  "SAHP7BHVCCJ6BUYT56IMKQDMQT3HRGSRTEAQ2JAUXNQ7UQ7OFDN4Y2WS"
-);
+const admin = Keypair.random();
+const FRIENDBOT_URL = new URL("/friendbot", RPC_URL);
+
+beforeAll(async () => {
+  const response = await fetch(
+    `${FRIENDBOT_URL}?addr=${encodeURIComponent(admin.publicKey())}`
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Quickstart Friendbot failed to fund integration account: ${response.status} ${await response.text()}`
+    );
+  }
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

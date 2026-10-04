@@ -1,11 +1,9 @@
 services:
   stellar:
     image: stellar/quickstart:latest
-    command: --standalone --enable-soroban-rpc
+    command: ["--local", "--enable", "rpc"]
     ports:
       - "8000:8000"
-    environment:
-      - NETWORK=standalone
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8000/soroban/rpc"]
       interval: 5s
