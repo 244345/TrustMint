@@ -135,7 +135,9 @@ async function invokeContract(
   args: xdr.ScVal[]
 ): Promise<xdr.ScVal> {
   const account = await rpcServer.getAccount(keypair.publicKey());
-  const contract = new Contract(contractId);
+  const contract = new Contract(
+    Address.contract(Buffer.from(contractId, "hex")).toString()
+  );
 
   const tx = new TransactionBuilder(account, {
     fee: BASE_FEE,
