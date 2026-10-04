@@ -186,7 +186,8 @@ describe("KYC Registry lifecycle", () => {
         )
       )
     );
-    kycContractId = await deployContract(admin, wasmHash, [adminAddr]);
+    kycContractId = await deployContract(admin, wasmHash, []);
+    await invokeContract(admin, kycContractId, "initialize", [adminAddr]);
   });
 
   it("deploys KYC registry and admin can add a verifier", async () => {
@@ -223,14 +224,16 @@ describe("Compliance Engine lifecycle", () => {
         )
       )
     );
-    kycContractId = await deployContract(admin, kycHash, [adminAddr]);
+    kycContractId = await deployContract(admin, kycHash, []);
+    await invokeContract(admin, kycContractId, "initialize", [adminAddr]);
 
     const ceHash = await uploadWasm(
       admin,
       path.join(WASM_DIR, "compliance_engine.wasm")
     );
     const kycAddr = contractAddress(kycContractId);
-    ceContractId = await deployContract(admin, ceHash, [adminAddr, kycAddr]);
+    ceContractId = await deployContract(admin, ceHash, []);
+    await invokeContract(admin, ceContractId, "initialize", [adminAddr, kycAddr]);
   });
 
   it("deploys compliance engine and default rules allow transfers", async () => {
@@ -304,7 +307,8 @@ describe("RWA Token lifecycle", () => {
     );
 
     const kycHash = await uploadWasm(admin, path.join(WASM_DIR, "kyc_registry.wasm"));
-    kycContractId = await deployContract(admin, kycHash, [adminAddr]);
+    kycContractId = await deployContract(admin, kycHash, []);
+    await invokeContract(admin, kycContractId, "initialize", [adminAddr]);
 
     const verifier = Keypair.random();
     const verifierAddr = xdr.ScVal.scvAddress(
@@ -316,7 +320,8 @@ describe("RWA Token lifecycle", () => {
 
     const ceHash = await uploadWasm(admin, path.join(WASM_DIR, "compliance_engine.wasm"));
     const kycAddr = contractAddress(kycContractId);
-    ceContractId = await deployContract(admin, ceHash, [adminAddr, kycAddr]);
+    ceContractId = await deployContract(admin, ceHash, []);
+    await invokeContract(admin, ceContractId, "initialize", [adminAddr, kycAddr]);
 
     const rwaHash = await uploadWasm(admin, path.join(WASM_DIR, "rwa_token.wasm"));
     const ceAddr = contractAddress(ceContractId);
@@ -352,11 +357,13 @@ describe("Invoice Token multi-invoice lifecycle", () => {
     );
 
     const kycHash = await uploadWasm(admin, path.join(WASM_DIR, "kyc_registry.wasm"));
-    kycContractId = await deployContract(admin, kycHash, [adminAddr]);
+    kycContractId = await deployContract(admin, kycHash, []);
+    await invokeContract(admin, kycContractId, "initialize", [adminAddr]);
 
     const ceHash = await uploadWasm(admin, path.join(WASM_DIR, "compliance_engine.wasm"));
     const kycAddr = contractAddress(kycContractId);
-    ceContractId = await deployContract(admin, ceHash, [adminAddr, kycAddr]);
+    ceContractId = await deployContract(admin, ceHash, []);
+    await invokeContract(admin, ceContractId, "initialize", [adminAddr, kycAddr]);
 
     const invoiceHash = await uploadWasm(
       admin,
