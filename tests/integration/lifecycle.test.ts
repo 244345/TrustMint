@@ -11,6 +11,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import {
+  Address,
   Keypair,
   Networks,
   rpc,
@@ -97,7 +98,7 @@ async function deployContract(
   })
     .addOperation(
       Operation.createCustomContract({
-        address: new Contract(keypair.publicKey()).address(),
+        address: Address.account(Buffer.from(keypair.rawPublicKey())),
         wasmHash: Buffer.from(wasmHash, "hex"),
         salt,
         constructorArgs,
