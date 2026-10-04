@@ -37,6 +37,13 @@ function contractAddress(contractId: string): xdr.ScVal {
   return xdr.ScVal.scvAddress(xdr.ScAddress.scAddressTypeContract(rawContractId));
 }
 
+function symbolMap(entries: xdr.ScMapEntry[]): xdr.ScVal {
+  entries.sort((a, b) =>
+    String(a.key().sym()).localeCompare(String(b.key().sym()))
+  );
+  return xdr.ScVal.scvMap(entries);
+}
+
 beforeAll(async () => {
   const response = await fetch(
     `${FRIENDBOT_URL}?addr=${encodeURIComponent(admin.publicKey())}`
@@ -373,7 +380,7 @@ describe("Invoice Token multi-invoice lifecycle", () => {
     );
     const ceAddr = contractAddress(ceContractId);
 
-    const initialMeta = xdr.ScVal.scvMap([
+    const initialMeta = symbolMap([
       new xdr.ScMapEntry({
         key: xdr.ScVal.scvSymbol("invoice_id"),
         val: xdr.ScVal.scvString("INV-001"),
@@ -442,7 +449,7 @@ describe("Invoice Token multi-invoice lifecycle", () => {
   });
 
   it("creates a second invoice", async () => {
-    const secondMeta = xdr.ScVal.scvMap([
+    const secondMeta = symbolMap([
       new xdr.ScMapEntry({
         key: xdr.ScVal.scvSymbol("invoice_id"),
         val: xdr.ScVal.scvString("INV-002"),
