@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import {
   Keypair,
   Networks,
-  SorobanRpc,
+  rpc,
   TransactionBuilder,
   BASE_FEE,
   xdr,
@@ -26,18 +26,19 @@ import * as path from "path";
 const RPC_URL = process.env.STELLAR_RPC_URL ?? "http://localhost:8000/soroban/rpc";
 const NETWORK_PASSPHRASE = Networks.STANDALONE;
 
-const rpc = new SorobanRpc.Server(RPC_URL, { allowHttp: true });
+const rpcServer = new rpc.Server(RPC_URL, { allowHttp: true });
 
-// Funded test account (quickstart pre-funds this key in standalone mode)
+// Public standalone-network root seed for local Quickstart only. Never use this
+// key on a public network or for real funds.
 const admin = Keypair.fromSecret(
-  "SCZANGBA5RLMPI7JMTP2UME5XM7JRQF6AQZH7KSGDTQR3FVTZFM7VQ"
+  "SAHP7BHVCCJ6BUYT56IMKQDMQT3HRGSRTEAQ2JAUXNQ7UQ7OFDN4Y2WS"
 );
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function uploadWasm(keypair: Keypair, wasmPath: string): Promise<string> {
   const wasmBytes = fs.readFileSync(wasmPath);
-  const account = await rpc.getAccount(keypair.publicKey());
+  const account = await rpcServer.getAccount(keypair.publicKey());
   const tx = new TransactionBuilder(account, {
     fee: BASE_FEE,
     networkPassphrase: NETWORK_PASSPHRASE,
@@ -48,15 +49,15 @@ async function uploadWasm(keypair: Keypair, wasmPath: string): Promise<string> {
     .setTimeout(30)
     .build();
 
-  const prepared = await rpc.prepareTransaction(tx);
+  const prepared = await rpcServer.prepareTransaction(tx);
   prepared.sign(keypair);
-  const result = await rpc.sendTransaction(prepared);
+  const result = await rpcServer.sendTransaction(prepared);
   const hash = result.hash;
 
-  let getResult = await rpc.getTransaction(hash);
+  let getResult = await rpcServer.getTransaction(hash);
   while (getResult.status === "NOT_FOUND") {
     await new Promise((r) => setTimeout(r, 1000));
-    getResult = await rpc.getTransaction(hash);
+    getResult = await rpcServer.getTransaction(hash);
   }
   if (getResult.status !== "SUCCESS") {
     throw new Error(`Upload failed: ${JSON.stringify(getResult)}`);
@@ -78,7 +79,7 @@ async function deployContract(
   wasmHash: string,
   constructorArgs: xdr.ScVal[]
 ): Promise<string> {
-  const account = await rpc.getAccount(keypair.publicKey());
+  const account = await rpcServer.getAccount(keypair.publicKey());
   const salt = Buffer.allocUnsafe(32);
   crypto.getRandomValues(salt);
 
@@ -97,15 +98,15 @@ async function deployContract(
     .setTimeout(30)
     .build();
 
-  const prepared = await rpc.prepareTransaction(tx);
+  const prepared = await rpcServer.prepareTransaction(tx);
   prepared.sign(keypair);
-  const result = await rpc.sendTransaction(prepared);
+  const result = await rpcServer.sendTransaction(prepared);
   const hash = result.hash;
 
-  let getResult = await rpc.getTransaction(hash);
+  let getResult = await rpcServer.getTransaction(hash);
   while (getResult.status === "NOT_FOUND") {
     await new Promise((r) => setTimeout(r, 1000));
-    getResult = await rpc.getTransaction(hash);
+    getResult = await rpcServer.getTransaction(hash);
   }
   if (getResult.status !== "SUCCESS") {
     throw new Error(`Deploy failed: ${JSON.stringify(getResult)}`);
@@ -129,7 +130,7 @@ async function invokeContract(
   method: string,
   args: xdr.ScVal[]
 ): Promise<xdr.ScVal> {
-  const account = await rpc.getAccount(keypair.publicKey());
+  const account = await rpcServer.getAccount(keypair.publicKey());
   const contract = new Contract(contractId);
 
   const tx = new TransactionBuilder(account, {
@@ -140,15 +141,15 @@ async function invokeContract(
     .setTimeout(30)
     .build();
 
-  const prepared = await rpc.prepareTransaction(tx);
+  const prepared = await rpcServer.prepareTransaction(tx);
   prepared.sign(keypair);
-  const result = await rpc.sendTransaction(prepared);
+  const result = await rpcServer.sendTransaction(prepared);
   const hash = result.hash;
 
-  let getResult = await rpc.getTransaction(hash);
+  let getResult = await rpcServer.getTransaction(hash);
   while (getResult.status === "NOT_FOUND") {
     await new Promise((r) => setTimeout(r, 1000));
-    getResult = await rpc.getTransaction(hash);
+    getResult = await rpcServer.getTransaction(hash);
   }
   if (getResult.status !== "SUCCESS") {
     throw new Error(`Invoke ${method} failed: ${JSON.stringify(getResult)}`);
@@ -162,7 +163,7 @@ async function invokeContract(
 
 const WASM_DIR = path.resolve(
   import.meta.dirname,
-  "../../target/wasm32-unknown-unknown/release"
+  "../../target/wasm32v1-none/release"
 );
 
 describe("KYC Registry lifecycle", () => {

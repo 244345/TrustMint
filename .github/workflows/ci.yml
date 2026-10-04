@@ -145,10 +145,10 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: tests/integration/package.json
+          cache-dependency-path: tests/integration/package-lock.json
       - name: Install integration test dependencies
         working-directory: tests/integration
-        run: npm install
+        run: npm ci
       - name: Run integration tests
         working-directory: tests/integration
         run: npm test
