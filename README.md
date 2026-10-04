@@ -19,7 +19,6 @@
   </p>
 </div>
 
-> **Status:** Early-stage developer starter kit. The public site is a frontend preview; contract-backed workflows require deployed contract IDs and are not currently configured on the preview. The contracts have not received an independent security audit. Do not use this code with real assets or funds without appropriate technical, legal, and security review.
 
 ## The idea
 
