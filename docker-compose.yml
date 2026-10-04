@@ -2,7 +2,7 @@ services:
   stellar:
     image: stellar/quickstart:latest
     # Match Soroban SDK 22 / JS SDK 13 so the RPC XDR stays in the supported range.
-    command: ["--local", "--enable", "rpc", "--protocol-version", "22"]
+    command: ["--local", "--enable", "rpc", "--limits", "testnet", "--protocol-version", "22"]
     ports:
       - "8000:8000"
     healthcheck:
