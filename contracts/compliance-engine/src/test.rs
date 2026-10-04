@@ -151,7 +151,9 @@ fn test_set_rules_rejects_min_holding_period_exceeding_365_days() {
     let res = client.try_set_rules(&rules(0, 31_536_001, 0, false));
     assert_eq!(
         res,
-        Err(Ok(Error::from(ComplianceError::MinHoldingPeriodExceeds365Days)))
+        Err(Ok(Error::from(
+            ComplianceError::MinHoldingPeriodExceeds365Days
+        )))
     );
 }
 
@@ -159,7 +161,10 @@ fn test_set_rules_rejects_min_holding_period_exceeding_365_days() {
 fn test_set_rules_rejects_negative_max_transfer_amount() {
     let (_env, client, _admin) = setup();
     let res = client.try_set_rules(&rules(-1, 0, 0, false));
-    assert_eq!(res, Err(Ok(Error::from(ComplianceError::NegativeMaxTransferAmount))));
+    assert_eq!(
+        res,
+        Err(Ok(Error::from(ComplianceError::NegativeMaxTransferAmount)))
+    );
 }
 
 #[test]
@@ -172,7 +177,12 @@ fn test_set_rules_rejects_max_holders_below_current_holder_count() {
     assert_eq!(client.holder_count(), 2);
 
     let res = client.try_set_rules(&rules(0, 0, 1, false));
-    assert_eq!(res, Err(Ok(Error::from(ComplianceError::MaxHoldersBelowCurrentCount))));
+    assert_eq!(
+        res,
+        Err(Ok(Error::from(
+            ComplianceError::MaxHoldersBelowCurrentCount
+        )))
+    );
 }
 
 #[test]
@@ -333,5 +343,5 @@ fn test_require_same_jurisdiction_blocks_cross_jurisdiction_transfer() {
 fn test_version_returns_nonempty() {
     let (_, client, _) = setup();
     let v = client.version();
-    assert!(v.len() > 0);
+    assert!(!v.is_empty());
 }

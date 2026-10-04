@@ -3,7 +3,10 @@
 use crate::{InvoiceMeta, InvoiceToken, InvoiceTokenClient};
 use compliance_engine::{ComplianceEngine, ComplianceEngineClient, ComplianceRules};
 use kyc_registry::{KycRegistry, KycRegistryClient};
-use soroban_sdk::{testutils::{Address as _, Ledger as _}, Address, Env, String, Vec};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger as _},
+    Address, Env, String,
+};
 
 // ── Test harness ─────────────────────────────────────────────────────────────
 
@@ -63,7 +66,14 @@ fn setup() -> Harness {
     );
     let token = InvoiceTokenClient::new(&env, &token_id);
 
-    Harness { env, token, kyc, compliance, verifier, admin }
+    Harness {
+        env,
+        token,
+        kyc,
+        compliance,
+        verifier,
+        admin,
+    }
 }
 
 impl Harness {
@@ -161,7 +171,10 @@ fn test_transfer_from_blocked_after_due_date() {
 fn test_metadata() {
     let h = setup();
     assert_eq!(h.token.decimals(), 7);
-    assert_eq!(h.token.name(), String::from_str(&h.env, "TrustMint Invoice"));
+    assert_eq!(
+        h.token.name(),
+        String::from_str(&h.env, "TrustMint Invoice")
+    );
     assert_eq!(
         h.token.get_meta(&inv_id(&h.env)).invoice_id,
         String::from_str(&h.env, "INV-001")
@@ -189,10 +202,7 @@ fn test_settle_then_redeem() {
     h.approve_kyc(&holder);
     h.token.issue(&inv_id(&h.env), &holder, &1_000);
 
-    assert!(h
-        .token
-        .try_redeem(&inv_id(&h.env), &holder, &500)
-        .is_err());
+    assert!(h.token.try_redeem(&inv_id(&h.env), &holder, &500).is_err());
 
     h.token.settle(&inv_id(&h.env));
     assert!(h.token.is_settled(&inv_id(&h.env)));
@@ -218,10 +228,7 @@ fn test_redeem_insufficient_balance() {
     h.approve_kyc(&holder);
     h.token.issue(&inv_id(&h.env), &holder, &100);
     h.token.settle(&inv_id(&h.env));
-    assert!(h
-        .token
-        .try_redeem(&inv_id(&h.env), &holder, &101)
-        .is_err());
+    assert!(h.token.try_redeem(&inv_id(&h.env), &holder, &101).is_err());
 }
 
 #[test]
@@ -232,10 +239,7 @@ fn test_redeem_blocked_when_compliance_paused() {
     h.token.issue(&inv_id(&h.env), &holder, &1_000);
     h.token.settle(&inv_id(&h.env));
     h.compliance.pause();
-    assert!(h
-        .token
-        .try_redeem(&inv_id(&h.env), &holder, &500)
-        .is_err());
+    assert!(h.token.try_redeem(&inv_id(&h.env), &holder, &500).is_err());
 }
 
 #[test]
@@ -246,10 +250,7 @@ fn test_redeem_blocked_for_blocklisted_holder() {
     h.token.issue(&inv_id(&h.env), &holder, &1_000);
     h.token.settle(&inv_id(&h.env));
     h.compliance.add_to_blocklist(&holder);
-    assert!(h
-        .token
-        .try_redeem(&inv_id(&h.env), &holder, &500)
-        .is_err());
+    assert!(h.token.try_redeem(&inv_id(&h.env), &holder, &500).is_err());
 }
 
 #[test]
@@ -286,7 +287,9 @@ fn test_transfer_blocked_by_holding_period() {
         .try_transfer(&inv_id(&h.env), &alice, &bob, &100)
         .is_err());
 
-    h.env.ledger().set_timestamp(h.env.ledger().timestamp() + 3601);
+    h.env
+        .ledger()
+        .set_timestamp(h.env.ledger().timestamp() + 3601);
     h.token.transfer(&inv_id(&h.env), &alice, &bob, &100);
     assert_eq!(h.token.balance(&bob, &inv_id(&h.env)), 100);
     assert_eq!(h.token.balance(&alice, &inv_id(&h.env)), 900);
@@ -310,7 +313,9 @@ fn test_update_kyc_registry_admin_only() {
             ),
         );
         let client2 = InvoiceTokenClient::new(&env2, &token_id2);
-        assert!(client2.try_update_kyc_registry(&Address::generate(&env2)).is_err());
+        assert!(client2
+            .try_update_kyc_registry(&Address::generate(&env2))
+            .is_err());
     }
 
     h.token.update_kyc_registry(&new_kyc);
@@ -354,10 +359,7 @@ fn test_update_compliance_engine_admin_only() {
     h.approve_kyc(&holder);
     h.token.issue(&inv_id(&h.env), &holder, &100);
     h.token.settle(&inv_id(&h.env));
-    assert!(h
-        .token
-        .try_redeem(&inv_id(&h.env), &holder, &50)
-        .is_err());
+    assert!(h.token.try_redeem(&inv_id(&h.env), &holder, &50).is_err());
 }
 
 // ── Multi-invoice tests ───────────────────────────────────────────────────────
@@ -446,7 +448,6 @@ fn test_list_invoices_pagination() {
 
 #[test]
 fn test_create_invoice_admin_only() {
-    let h = setup();
     let env2 = Env::default();
     let non_admin = Address::generate(&env2);
     let token_id2 = env2.register(
@@ -497,7 +498,7 @@ fn test_multi_invoice_transfer_only_within_invoice() {
 fn test_version_returns_nonempty() {
     let h = setup();
     let v = h.token.version();
-    assert!(v.len() > 0);
+    assert!(!v.is_empty());
 }
 
 #[test]
@@ -509,18 +510,19 @@ fn test_partial_settle_proportional_redemption() {
     // Issue 100 tokens against a 1,000,000,000,000-stroop face value
     let face = 1_000_000_000_000i128;
     let issued = 100i128;
-    h.token.issue(&holder, &issued);
+    let invoice_id = inv_id(&h.env);
+    h.token.issue(&invoice_id, &holder, &issued);
 
     // Partial settle for 60% of face value
     let settlement = face * 60 / 100;
-    h.token.partial_settle(&settlement);
+    h.token.partial_settle(&invoice_id, &settlement);
 
-    assert_eq!(h.token.settlement_amount(), settlement);
-    assert!(h.token.is_settled());
+    assert_eq!(h.token.settlement_amount(&invoice_id), settlement);
+    assert!(h.token.is_settled(&invoice_id));
 
     // Holder can redeem up to issued * settlement / face = 60 tokens
     let max_redeemable = issued * settlement / face;
-    h.token.redeem(&holder, &max_redeemable);
+    h.token.redeem(&invoice_id, &holder, &max_redeemable);
 }
 
 #[test]
@@ -530,11 +532,12 @@ fn test_partial_settle_blocks_over_proportional_redeem() {
     h.approve_kyc(&holder);
 
     let face = 1_000_000_000_000i128;
-    h.token.issue(&holder, &100);
-    h.token.partial_settle(&(face * 50 / 100));
+    let invoice_id = inv_id(&h.env);
+    h.token.issue(&invoice_id, &holder, &100);
+    h.token.partial_settle(&invoice_id, &(face * 50 / 100));
 
     // Trying to redeem more than 50 (the proportional share) should fail
-    assert!(h.token.try_redeem(&holder, &51).is_err());
+    assert!(h.token.try_redeem(&invoice_id, &holder, &51).is_err());
 }
 
 #[test]
@@ -543,24 +546,28 @@ fn test_settle_sets_full_face_value() {
     let holder = Address::generate(&h.env);
     h.approve_kyc(&holder);
 
-    h.token.issue(&holder, &100);
-    h.token.settle();
+    let invoice_id = inv_id(&h.env);
+    h.token.issue(&invoice_id, &holder, &100);
+    h.token.settle(&invoice_id);
 
     let face = 1_000_000_000_000i128;
-    assert_eq!(h.token.settlement_amount(), face);
+    assert_eq!(h.token.settlement_amount(&invoice_id), face);
     // Full settlement: holder can redeem all tokens
-    h.token.redeem(&holder, &100);
+    h.token.redeem(&invoice_id, &holder, &100);
 }
 
 #[test]
 fn test_partial_settle_rejects_zero() {
     let h = setup();
-    assert!(h.token.try_partial_settle(&0).is_err());
+    assert!(h.token.try_partial_settle(&inv_id(&h.env), &0).is_err());
 }
 
 #[test]
 fn test_partial_settle_rejects_excess() {
     let h = setup();
     let face = 1_000_000_000_000i128;
-    assert!(h.token.try_partial_settle(&(face + 1)).is_err());
+    assert!(h
+        .token
+        .try_partial_settle(&inv_id(&h.env), &(face + 1))
+        .is_err());
 }

@@ -6,7 +6,6 @@ use soroban_sdk::{
     Address, Env, Error, String,
 };
 
-
 fn setup() -> (Env, KycRegistryClient<'static>, Address) {
     let env = Env::default();
     env.mock_all_auths();
@@ -29,7 +28,6 @@ fn test_add_verifier_and_approve() {
     client.approve(&verifier, &subject, &1, &0, &String::from_str(&env, "US"));
     assert!(client.is_approved(&subject));
     assert_eq!(client.get_tier(&subject), 1);
-
 }
 
 #[test]
@@ -159,9 +157,7 @@ fn test_instance_ttl_bump() {
     let verifier = Address::generate(&env);
     client.add_verifier(&verifier);
 
-    let initial_ttl = env.as_contract(&contract_id, || {
-        env.storage().instance().get_ttl()
-    });
+    let initial_ttl = env.as_contract(&contract_id, || env.storage().instance().get_ttl());
     assert_eq!(initial_ttl, bump);
 
     // Advance the ledger sequence to decrease TTL below THRESHOLD
@@ -170,18 +166,14 @@ fn test_instance_ttl_bump() {
         l.sequence_number += 30_000;
     });
 
-    let reduced_ttl = env.as_contract(&contract_id, || {
-        env.storage().instance().get_ttl()
-    });
+    let reduced_ttl = env.as_contract(&contract_id, || env.storage().instance().get_ttl());
     assert_eq!(reduced_ttl, initial_ttl - 30_000);
 
     // Calling a query function like is_approved should bump it back to BUMP
     let subject = Address::generate(&env);
     client.is_approved(&subject);
 
-    let bumped_ttl = env.as_contract(&contract_id, || {
-        env.storage().instance().get_ttl()
-    });
+    let bumped_ttl = env.as_contract(&contract_id, || env.storage().instance().get_ttl());
     assert_eq!(bumped_ttl, bump);
 }
 
@@ -259,5 +251,5 @@ fn test_approve_accepts_valid_iso_code() {
 fn test_version_returns_nonempty() {
     let (_, client, _) = setup();
     let v = client.version();
-    assert!(v.len() > 0);
+    assert!(!v.is_empty());
 }

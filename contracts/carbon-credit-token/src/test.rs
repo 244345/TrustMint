@@ -3,7 +3,7 @@
 use crate::{CarbonCreditToken, CarbonCreditTokenClient, ProjectMeta};
 use compliance_engine::{ComplianceEngine, ComplianceEngineClient};
 use kyc_registry::{KycRegistry, KycRegistryClient};
-use soroban_sdk::{testutils::{Address as _, Events as _}, Address, Env, IntoVal, String};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
 extern crate alloc;
 
 struct Harness {
@@ -171,7 +171,6 @@ fn test_retire_records_receipt() {
     let r = h.token.get_receipt(&0);
     assert_eq!(r.amount, 40);
     assert_eq!(r.retiree, alice);
-
 }
 
 #[test]
@@ -270,7 +269,9 @@ fn test_update_kyc_registry_admin_only() {
             ),
         );
         let client2 = CarbonCreditTokenClient::new(&env2, &token_id2);
-        assert!(client2.try_update_kyc_registry(&Address::generate(&env2)).is_err());
+        assert!(client2
+            .try_update_kyc_registry(&Address::generate(&env2))
+            .is_err());
     }
 
     // Admin succeeds
@@ -300,7 +301,9 @@ fn test_update_compliance_engine_admin_only() {
             ),
         );
         let client2 = CarbonCreditTokenClient::new(&env2, &token_id2);
-        assert!(client2.try_update_compliance_engine(&Address::generate(&env2)).is_err());
+        assert!(client2
+            .try_update_compliance_engine(&Address::generate(&env2))
+            .is_err());
     }
 
     // Deploy a second compliance engine and pause it
@@ -400,7 +403,10 @@ fn test_valid_project_type_accepted_in_update_meta() {
     let mut new_meta = h.token.get_meta();
     new_meta.project_type = String::from_str(&h.env, "renewable");
     h.token.update_meta(&new_meta);
-    assert_eq!(h.token.get_meta().project_type, String::from_str(&h.env, "renewable"));
+    assert_eq!(
+        h.token.get_meta().project_type,
+        String::from_str(&h.env, "renewable")
+    );
 }
 
 #[test]
@@ -428,7 +434,7 @@ fn test_update_compliance_engine_affects_transfers() {
 fn test_version_returns_nonempty() {
     let h = setup();
     let v = h.token.version();
-    assert!(v.len() > 0);
+    assert!(!v.is_empty());
 }
 
 #[test]

@@ -1,8 +1,9 @@
 #![no_std]
 #![cfg_attr(not(test), deny(clippy::unwrap_used))]
+#![allow(clippy::too_many_arguments)]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, panic_with_error, symbol_short, Address,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
     Env, String, Symbol,
 };
 
@@ -47,23 +48,10 @@ pub enum RwaError {
     AccountFrozen = 7,
 }
 
-pub const META_LEGAL_ENTITY: &str = "legal_ent";
-pub const META_GOVERNING_LAW: &str = "gov_law";
-pub const META_ISIN: &str = "isin";
-pub const META_PROSPECTUS_HASH: &str = "pros_hash";
-
-#[contracttype]
-#[derive(Clone)]
-pub struct ComplianceMetadata {
-    pub legal_entity: Option<String>,
-    pub governing_law: Option<String>,
-    pub isin: Option<String>,
-    pub prospectus_hash: Option<String>,
-}
-
 #[contract]
 pub struct RwaToken;
 
+#[allow(clippy::too_many_arguments)]
 #[contractimpl]
 impl RwaToken {
     /// Constructor — called atomically at deploy time via `stellar contract deploy -- --admin ...`.
@@ -147,8 +135,7 @@ impl RwaToken {
         let admin = admin::read_admin(&env);
         admin.require_auth();
         compliance::write_compliance_engine(&env, &new_engine);
-        env.events()
-            .publish((symbol_short!("upd_ce"),), new_engine);
+        env.events().publish((symbol_short!("upd_ce"),), new_engine);
     }
 
     // ── Freeze / Unfreeze ────────────────────────────────────────────────────
@@ -368,7 +355,11 @@ impl RwaToken {
     pub fn get_all_compliance_metadata(env: Env) -> ComplianceMetadata {
         let read = |key: &str| {
             let v = compliance::read_metadata(&env, Symbol::new(&env, key));
-            if v.len() > 0 { Some(v) } else { None }
+            if !v.is_empty() {
+                Some(v)
+            } else {
+                None
+            }
         };
         ComplianceMetadata {
             legal_entity: read(META_LEGAL_ENTITY),

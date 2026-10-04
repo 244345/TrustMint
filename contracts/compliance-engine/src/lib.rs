@@ -5,8 +5,8 @@
 mod test;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, panic_with_error, symbol_short,
-    Address, Env, String, Vec,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
+    Env, String, Vec,
 };
 
 #[contracterror]
@@ -77,17 +77,29 @@ impl ComplianceEngine {
 
     pub fn propose_admin(env: Env, new_admin: Address) {
         Self::require_admin(&env);
-        env.storage().instance().set(&DataKey::PendingAdmin, &new_admin);
-        env.events().publish((symbol_short!("proposed"),), new_admin);
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingAdmin, &new_admin);
+        env.events()
+            .publish((symbol_short!("proposed"),), new_admin);
     }
 
     pub fn accept_admin(env: Env) {
-        let pending: Address = env.storage().instance().get(&DataKey::PendingAdmin).expect("no pending admin");
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingAdmin)
+            .expect("no pending admin");
         pending.require_auth();
-        let old_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let old_admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         env.storage().instance().set(&DataKey::Admin, &pending);
         env.storage().instance().remove(&DataKey::PendingAdmin);
-        env.events().publish((symbol_short!("admin_set"),), (old_admin, pending));
+        env.events()
+            .publish((symbol_short!("admin_set"),), (old_admin, pending));
     }
 
     // ── Rule management ──────────────────────────────────────────────────────
@@ -117,7 +129,10 @@ impl ComplianceEngine {
 
     pub fn get_rules(env: Env) -> ComplianceRules {
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
-        env.storage().instance().get(&DataKey::Rules).unwrap()
+        env.storage()
+            .instance()
+            .get(&DataKey::Rules)
+            .expect("value must exist")
     }
 
     pub fn add_to_blocklist(env: Env, addr: Address) {
@@ -190,7 +205,11 @@ impl ComplianceEngine {
     pub fn pause(env: Env) {
         Self::require_admin(&env);
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
-        let mut rules: ComplianceRules = env.storage().instance().get(&DataKey::Rules).unwrap();
+        let mut rules: ComplianceRules = env
+            .storage()
+            .instance()
+            .get(&DataKey::Rules)
+            .expect("value must exist");
         rules.paused = true;
         env.storage().instance().set(&DataKey::Rules, &rules);
         env.events().publish((symbol_short!("paused"),), ());
@@ -199,7 +218,11 @@ impl ComplianceEngine {
     pub fn unpause(env: Env) {
         Self::require_admin(&env);
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
-        let mut rules: ComplianceRules = env.storage().instance().get(&DataKey::Rules).unwrap();
+        let mut rules: ComplianceRules = env
+            .storage()
+            .instance()
+            .get(&DataKey::Rules)
+            .expect("value must exist");
         rules.paused = false;
         env.storage().instance().set(&DataKey::Rules, &rules);
         env.events().publish((symbol_short!("unpaused"),), ());
@@ -211,7 +234,11 @@ impl ComplianceEngine {
     /// transfer is compliant with all configured rules.
     pub fn can_transfer(env: Env, from: Address, to: Address, amount: i128) -> bool {
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
-        let rules: ComplianceRules = env.storage().instance().get(&DataKey::Rules).unwrap();
+        let rules: ComplianceRules = env
+            .storage()
+            .instance()
+            .get(&DataKey::Rules)
+            .expect("value must exist");
 
         if rules.paused {
             return false;
@@ -228,7 +255,7 @@ impl ComplianceEngine {
                 .storage()
                 .instance()
                 .get(&DataKey::KycRegistry)
-                .unwrap();
+                .expect("value must exist");
             let kyc = kyc_iface::KycRegistryClient::new(&env, &kyc_registry);
             let from_record = kyc.get_record(&from);
             let to_record = kyc.get_record(&to);
@@ -244,7 +271,7 @@ impl ComplianceEngine {
                 .storage()
                 .instance()
                 .get(&DataKey::KycRegistry)
-                .unwrap();
+                .expect("value must exist");
             let kyc = kyc_iface::KycRegistryClient::new(&env, &kyc_registry);
             let from_record = kyc.get_record(&from);
             let to_record = kyc.get_record(&to);
@@ -342,6 +369,13 @@ impl ComplianceEngine {
         env.storage()
             .instance()
             .get(&DataKey::Blocklist)
+            .unwrap_or_else(|| Vec::new(env))
+    }
+
+    fn blocked_jurisdictions(env: &Env) -> Vec<String> {
+        env.storage()
+            .instance()
+            .get(&DataKey::BlockedJurisdictions)
             .unwrap_or_else(|| Vec::new(env))
     }
 

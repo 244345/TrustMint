@@ -31,7 +31,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-          targets: wasm32-unknown-unknown
+          targets: wasm32v1-none
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -91,7 +91,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown
+          targets: wasm32v1-none
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -102,7 +102,7 @@ jobs:
           key: ${{ runner.os }}-cargo-wasm-${{ matrix.crate }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-wasm-${{ matrix.crate }}-
       - name: Build WASM
-        run: cargo build --release --target wasm32-unknown-unknown -p ${{ matrix.crate }}
+        run: cargo build --release --target wasm32v1-none -p ${{ matrix.crate }}
 
   integration:
     name: Integration Tests
@@ -113,7 +113,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown
+          targets: wasm32v1-none
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -126,7 +126,7 @@ jobs:
       - name: Build all WASM binaries
         run: |
           for crate in compliance-engine kyc-registry rwa-token invoice-token property-token carbon-credit-token; do
-            cargo build --release --target wasm32-unknown-unknown -p $crate
+            cargo build --release --target wasm32v1-none -p $crate
           done
       - name: Start Stellar quickstart node
         run: docker compose up -d

@@ -5,8 +5,8 @@
 mod test;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, panic_with_error, symbol_short,
-    Address, Env, String, Vec,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
+    Env, String, Vec,
 };
 
 #[contracterror]
@@ -84,18 +84,30 @@ impl KycRegistry {
     pub fn propose_admin(env: Env, new_admin: Address) {
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
         Self::require_admin(&env);
-        env.storage().instance().set(&DataKey::PendingAdmin, &new_admin);
-        env.events().publish((symbol_short!("proposed"),), new_admin);
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingAdmin, &new_admin);
+        env.events()
+            .publish((symbol_short!("proposed"),), new_admin);
     }
 
     pub fn accept_admin(env: Env) {
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
-        let pending: Address = env.storage().instance().get(&DataKey::PendingAdmin).expect("no pending admin");
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingAdmin)
+            .expect("no pending admin");
         pending.require_auth();
-        let old_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let old_admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         env.storage().instance().set(&DataKey::Admin, &pending);
         env.storage().instance().remove(&DataKey::PendingAdmin);
-        env.events().publish((symbol_short!("admin_set"),), (old_admin, pending));
+        env.events()
+            .publish((symbol_short!("admin_set"),), (old_admin, pending));
     }
 
     // ── Verifier management ──────────────────────────────────────────────────
@@ -177,7 +189,7 @@ impl KycRegistry {
         }
         let end = (start + effective_limit).min(total);
         for i in start..end {
-            result.push_back(list.get(i).unwrap());
+            result.push_back(list.get(i).expect("value must exist"));
         }
         result
     }
@@ -333,31 +345,60 @@ impl KycRegistry {
 
     fn write_record(env: &Env, addr: Address, record: KycRecord) {
         if record.status == KycStatus::Approved && record.expiry != 0 {
-            let idx: u32 = env.storage().instance().get(&DataKey::ExpiryIndexCount).unwrap_or(0);
-            let entry = ExpiryEntry { expiry: record.expiry, addr: addr.clone() };
+            let idx: u32 = env
+                .storage()
+                .instance()
+                .get(&DataKey::ExpiryIndexCount)
+                .unwrap_or(0);
+            let entry = ExpiryEntry {
+                expiry: record.expiry,
+                addr: addr.clone(),
+            };
             let ik = DataKey::ExpiryIndex(idx);
             env.storage().persistent().set(&ik, &entry);
             env.storage().persistent().extend_ttl(&ik, THRESHOLD, BUMP);
-            env.storage().instance().set(&DataKey::ExpiryIndexCount, &(idx + 1));
+            env.storage()
+                .instance()
+                .set(&DataKey::ExpiryIndexCount, &(idx + 1));
         }
         let key = DataKey::KycStatus(addr);
         env.storage().persistent().set(&key, &record);
         env.storage().persistent().extend_ttl(&key, THRESHOLD, BUMP);
     }
 
-    pub fn get_expiring_soon(env: Env, within_seconds: u64, start: u32, limit: u32) -> Vec<ExpiringRecord> {
+    pub fn get_expiring_soon(
+        env: Env,
+        within_seconds: u64,
+        start: u32,
+        limit: u32,
+    ) -> Vec<ExpiringRecord> {
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
-        let count: u32 = env.storage().instance().get(&DataKey::ExpiryIndexCount).unwrap_or(0);
+        let count: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::ExpiryIndexCount)
+            .unwrap_or(0);
         let now = env.ledger().timestamp();
         let capped = limit.min(50);
         let mut out: Vec<ExpiringRecord> = Vec::new(&env);
         let mut i = start;
         while i < count && out.len() < capped {
-            if let Some(entry) = env.storage().persistent().get::<DataKey, ExpiryEntry>(&DataKey::ExpiryIndex(i)) {
+            if let Some(entry) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, ExpiryEntry>(&DataKey::ExpiryIndex(i))
+            {
                 if entry.expiry > now && entry.expiry <= now + within_seconds {
-                    if let Some(record) = env.storage().persistent().get::<DataKey, KycRecord>(&DataKey::KycStatus(entry.addr.clone())) {
+                    if let Some(record) = env
+                        .storage()
+                        .persistent()
+                        .get::<DataKey, KycRecord>(&DataKey::KycStatus(entry.addr.clone()))
+                    {
                         if record.status == KycStatus::Approved {
-                            out.push_back(ExpiringRecord { addr: entry.addr, record });
+                            out.push_back(ExpiringRecord {
+                                addr: entry.addr,
+                                record,
+                            });
                         }
                     }
                 }

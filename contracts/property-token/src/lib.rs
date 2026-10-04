@@ -10,8 +10,8 @@
 mod test;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, panic_with_error, symbol_short,
-    Address, Env, String, Vec,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
+    Env, String, Vec,
 };
 
 #[contracterror]
@@ -145,7 +145,11 @@ impl PropertyToken {
     // ── Admin ─────────────────────────────────────────────────────────────────
 
     pub fn update_kyc_registry(env: Env, new_registry: Address) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         admin.require_auth();
         env.storage()
             .instance()
@@ -155,28 +159,43 @@ impl PropertyToken {
     }
 
     pub fn update_compliance_engine(env: Env, new_engine: Address) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         admin.require_auth();
         env.storage()
             .instance()
             .set(&DataKey::ComplianceEngine, &new_engine);
-        env.events()
-            .publish((symbol_short!("upd_ce"),), new_engine);
+        env.events().publish((symbol_short!("upd_ce"),), new_engine);
     }
 
     pub fn propose_admin(env: Env, new_admin: Address) {
         Self::require_admin(&env);
-        env.storage().instance().set(&DataKey::PendingAdmin, &new_admin);
-        env.events().publish((symbol_short!("proposed"),), new_admin);
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingAdmin, &new_admin);
+        env.events()
+            .publish((symbol_short!("proposed"),), new_admin);
     }
 
     pub fn accept_admin(env: Env) {
-        let pending: Address = env.storage().instance().get(&DataKey::PendingAdmin).expect("no pending admin");
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingAdmin)
+            .expect("no pending admin");
         pending.require_auth();
-        let old_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let old_admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         env.storage().instance().set(&DataKey::Admin, &pending);
         env.storage().instance().remove(&DataKey::PendingAdmin);
-        env.events().publish((symbol_short!("admin_set"),), (old_admin, pending));
+        env.events()
+            .publish((symbol_short!("admin_set"),), (old_admin, pending));
     }
 
     // ── Metadata ─────────────────────────────────────────────────────────────
@@ -195,7 +214,9 @@ impl PropertyToken {
         Self::validate_property_type(&env, &new_meta.property_type);
         let current = Self::get_meta(env.clone());
         // Cannot change structural fields
-        if new_meta.property_id != current.property_id || new_meta.total_shares != current.total_shares {
+        if new_meta.property_id != current.property_id
+            || new_meta.total_shares != current.total_shares
+        {
             panic!("Cannot change property_id or total_shares");
         }
         env.storage()
@@ -318,7 +339,8 @@ impl PropertyToken {
             Self::remove_holder_local(&env, &from);
         }
         // Emit buyback event
-        env.events().publish((symbol_short!("buyback"),), (from, shares));
+        env.events()
+            .publish((symbol_short!("buyback"),), (from, shares));
     }
 
     // ── SEP-41 Allowance / Delegated Transfer ───────────────────────────────
@@ -633,7 +655,11 @@ impl PropertyToken {
             .get(&DataKey::ComplianceEngine)
             .expect("compliance engine must be set");
         let client = ComplianceEngineClient::new(env, &engine);
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         if !client.can_transfer(&admin, to, &shares) {
             panic!("mint blocked by compliance");
         }
@@ -673,10 +699,20 @@ impl PropertyToken {
             }
         }
         holders.push_back(addr.clone());
-        env.storage().persistent().set(&DataKey::HolderList, &holders);
-        env.storage().persistent().extend_ttl(&DataKey::HolderList, THRESHOLD, BUMP);
-        let count: u32 = env.storage().instance().get(&DataKey::HolderCount).unwrap_or(0);
-        env.storage().instance().set(&DataKey::HolderCount, &(count + 1));
+        env.storage()
+            .persistent()
+            .set(&DataKey::HolderList, &holders);
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::HolderList, THRESHOLD, BUMP);
+        let count: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::HolderCount)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::HolderCount, &(count + 1));
     }
 
     fn remove_holder_local(env: &Env, addr: &Address) {
@@ -695,10 +731,20 @@ impl PropertyToken {
             }
         }
         if found {
-            env.storage().persistent().set(&DataKey::HolderList, &new_holders);
-            env.storage().persistent().extend_ttl(&DataKey::HolderList, THRESHOLD, BUMP);
-            let count: u32 = env.storage().instance().get(&DataKey::HolderCount).unwrap_or(0);
-            env.storage().instance().set(&DataKey::HolderCount, &count.saturating_sub(1));
+            env.storage()
+                .persistent()
+                .set(&DataKey::HolderList, &new_holders);
+            env.storage()
+                .persistent()
+                .extend_ttl(&DataKey::HolderList, THRESHOLD, BUMP);
+            let count: u32 = env
+                .storage()
+                .instance()
+                .get(&DataKey::HolderCount)
+                .unwrap_or(0);
+            env.storage()
+                .instance()
+                .set(&DataKey::HolderCount, &count.saturating_sub(1));
         }
     }
 

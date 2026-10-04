@@ -1,9 +1,9 @@
 #![cfg(test)]
 
-use crate::{ComplianceMetadata, RwaToken, RwaTokenClient, RwaError, META_ISIN, META_LEGAL_ENTITY};
+use crate::{ComplianceMetadata, RwaToken, RwaTokenClient, META_ISIN, META_LEGAL_ENTITY};
 use compliance_engine::{ComplianceEngine, ComplianceEngineClient, ComplianceRules};
 use kyc_registry::{KycRegistry, KycRegistryClient};
-use soroban_sdk::{testutils::Address as _, Address, Env, IntoVal, String};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
 #[allow(dead_code)]
 struct Harness {
@@ -109,7 +109,6 @@ fn test_transfer_happy_path() {
 
     assert_eq!(h.token.balance(&alice), 600);
     assert_eq!(h.token.balance(&bob), 400);
-
 }
 
 #[test]
@@ -372,10 +371,7 @@ fn test_constructor_sets_compliance_metadata() {
         meta.legal_entity,
         Some(String::from_str(&env, "Issuer LLC"))
     );
-    assert_eq!(
-        meta.governing_law,
-        Some(String::from_str(&env, "New York"))
-    );
+    assert_eq!(meta.governing_law, Some(String::from_str(&env, "New York")));
     assert!(meta.isin.is_none());
 }
 
@@ -421,5 +417,5 @@ fn test_invalid_asset_type() {
 fn test_version_returns_nonempty() {
     let h = setup();
     let v = h.token.version();
-    assert!(v.len() > 0);
+    assert!(!v.is_empty());
 }

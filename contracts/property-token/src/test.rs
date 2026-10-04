@@ -5,7 +5,7 @@ use compliance_engine::{ComplianceEngine, ComplianceEngineClient, ComplianceRule
 use kyc_registry::{KycRegistry, KycRegistryClient};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
-    Address, Env, IntoVal, String,
+    Address, Env, String,
 };
 
 struct Harness {
@@ -318,7 +318,7 @@ fn test_holder_removed_when_balance_hits_zero() {
     assert_eq!(h.token.holder_count(), 1);
     let holders = h.token.get_holders(&0, &50);
     assert_eq!(holders.len(), 1);
-    assert_eq!(holders.get(0).unwrap(), bob);
+    assert_eq!(holders.get(0).expect("value must exist"), bob);
 }
 
 #[test]
@@ -370,8 +370,12 @@ fn test_transfer_from_rejects_recipient_below_required_tier() {
     h.approve_kyc_with_tier(&bob, 0);
     h.approve_kyc_with_tier(&spender, 1);
     h.token.mint(&alice, &100);
-    h.token.approve(&alice, &spender, &50, &(h.env.ledger().sequence() + 100));
-    assert!(h.token.try_transfer_from(&spender, &alice, &bob, &50).is_err());
+    h.token
+        .approve(&alice, &spender, &50, &(h.env.ledger().sequence() + 100));
+    assert!(h
+        .token
+        .try_transfer_from(&spender, &alice, &bob, &50)
+        .is_err());
 }
 
 #[test]
@@ -384,7 +388,8 @@ fn test_transfer_from_accepts_recipient_with_sufficient_tier() {
     h.approve_kyc_with_tier(&bob, 1);
     h.approve_kyc_with_tier(&spender, 1);
     h.token.mint(&alice, &100);
-    h.token.approve(&alice, &spender, &50, &(h.env.ledger().sequence() + 100));
+    h.token
+        .approve(&alice, &spender, &50, &(h.env.ledger().sequence() + 100));
     h.token.transfer_from(&spender, &alice, &bob, &50);
     assert_eq!(h.token.balance(&bob), 50);
 }
@@ -438,7 +443,10 @@ fn test_valid_property_type_accepted_in_update_meta() {
     let mut new_meta = h.token.get_meta();
     new_meta.property_type = String::from_str(&h.env, "commercial");
     h.token.update_meta(&new_meta);
-    assert_eq!(h.token.get_meta().property_type, String::from_str(&h.env, "commercial"));
+    assert_eq!(
+        h.token.get_meta().property_type,
+        String::from_str(&h.env, "commercial")
+    );
 }
 
 // ── update_kyc_registry / update_compliance_engine tests ─────────────────────
@@ -462,7 +470,9 @@ fn test_update_kyc_registry_admin_only() {
             ),
         );
         let client2 = PropertyTokenClient::new(&env2, &token_id2);
-        assert!(client2.try_update_kyc_registry(&Address::generate(&env2)).is_err());
+        assert!(client2
+            .try_update_kyc_registry(&Address::generate(&env2))
+            .is_err());
     }
 
     // Admin succeeds
@@ -492,7 +502,9 @@ fn test_update_compliance_engine_admin_only() {
             ),
         );
         let client2 = PropertyTokenClient::new(&env2, &token_id2);
-        assert!(client2.try_update_compliance_engine(&Address::generate(&env2)).is_err());
+        assert!(client2
+            .try_update_compliance_engine(&Address::generate(&env2))
+            .is_err());
     }
 
     // Deploy a second compliance engine and pause it
@@ -573,7 +585,7 @@ fn test_buyback_removes_holder_on_zero_balance() {
     assert_eq!(h.token.holder_count(), 1);
     let holders = h.token.get_holders(&0, &50);
     assert_eq!(holders.len(), 1);
-    assert_eq!(holders.get(0).unwrap(), bob);
+    assert_eq!(holders.get(0).expect("value must exist"), bob);
 }
 
 #[test]
@@ -626,7 +638,7 @@ fn test_buyback_rejects_kyc_unapproved_holder() {
 fn test_version_returns_nonempty() {
     let h = setup();
     let v = h.token.version();
-    assert!(v.len() > 0);
+    assert!(!v.is_empty());
 }
 
 #[test]
@@ -646,10 +658,10 @@ fn test_dividend_history_records_deposits() {
     let history = h.token.get_dividend_history(&0, &10);
     assert_eq!(history.len(), 2);
 
-    let first = history.get(0).unwrap();
+    let first = history.get(0).expect("value must exist");
     assert_eq!(first.amount, 1_000);
 
-    let second = history.get(1).unwrap();
+    let second = history.get(1).expect("value must exist");
     assert_eq!(second.amount, 2_000);
 }
 
@@ -664,8 +676,14 @@ fn test_dividend_history_running_total_dps() {
     h.token.deposit_dividend(&2_000);
 
     let history = h.token.get_dividend_history(&0, &10);
-    assert_eq!(history.get(0).unwrap().running_total_dps, 1);
-    assert_eq!(history.get(1).unwrap().running_total_dps, 3);
+    assert_eq!(
+        history.get(0).expect("value must exist").running_total_dps,
+        1
+    );
+    assert_eq!(
+        history.get(1).expect("value must exist").running_total_dps,
+        3
+    );
 }
 
 #[test]
@@ -681,7 +699,7 @@ fn test_dividend_history_pagination() {
 
     let page = h.token.get_dividend_history(&2, &2);
     assert_eq!(page.len(), 2);
-    assert_eq!(page.get(0).unwrap().amount, 100);
+    assert_eq!(page.get(0).expect("value must exist").amount, 100);
 }
 
 #[test]

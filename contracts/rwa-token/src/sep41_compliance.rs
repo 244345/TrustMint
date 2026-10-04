@@ -1,9 +1,12 @@
 #![cfg(test)]
 
 use crate::{ComplianceMetadata, RwaToken, RwaTokenClient};
-use compliance_engine::{ComplianceEngine, ComplianceEngineClient, ComplianceRules};
+use compliance_engine::{ComplianceEngine, ComplianceEngineClient};
 use kyc_registry::{KycRegistry, KycRegistryClient};
-use soroban_sdk::{testutils::{Address as _, Ledger as _}, Address, Env, String};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger as _},
+    Address, Env, String,
+};
 
 /// Test harness for SEP-41 compliance tests
 #[allow(dead_code)]
@@ -76,10 +79,7 @@ impl Sep41Harness {
 #[test]
 fn sep41_name() {
     let h = setup_sep41();
-    assert_eq!(
-        h.token.name(),
-        String::from_str(&h.env, "TrustMint RWA")
-    );
+    assert_eq!(h.token.name(), String::from_str(&h.env, "TrustMint RWA"));
 }
 
 // ── symbol ────────────────────────────────────────────────────────────

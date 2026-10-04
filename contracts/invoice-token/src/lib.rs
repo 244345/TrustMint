@@ -11,8 +11,8 @@
 mod test;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, panic_with_error, symbol_short,
-    Address, Env, String, Vec,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
+    Env, String, Vec,
 };
 
 #[contracterror]
@@ -41,12 +41,13 @@ pub enum DataKey {
     PendingAdmin,
     KycRegistry,
     ComplianceEngine,
-    InvoiceMeta,
-    Balance(Address),
-    Allowance(Address, Address),
-    TotalSupply,
-    Settled,
-    SettlementAmount,
+    InvoiceMeta(String),
+    InvoicesList,
+    Balance(Address, String),
+    Allowance(Address, Address, String),
+    TotalSupply(String),
+    Settled(String),
+    SettlementAmount(String),
 }
 
 #[contracttype]
@@ -114,7 +115,11 @@ impl InvoiceToken {
     // ── Admin ─────────────────────────────────────────────────────────────────
 
     pub fn update_kyc_registry(env: Env, new_registry: Address) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         admin.require_auth();
         env.storage()
             .instance()
@@ -124,13 +129,16 @@ impl InvoiceToken {
     }
 
     pub fn update_compliance_engine(env: Env, new_engine: Address) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         admin.require_auth();
         env.storage()
             .instance()
             .set(&DataKey::ComplianceEngine, &new_engine);
-        env.events()
-            .publish((symbol_short!("upd_ce"),), new_engine);
+        env.events().publish((symbol_short!("upd_ce"),), new_engine);
     }
 
     pub fn propose_admin(env: Env, new_admin: Address) {
@@ -138,7 +146,8 @@ impl InvoiceToken {
         env.storage()
             .instance()
             .set(&DataKey::PendingAdmin, &new_admin);
-        env.events().publish((symbol_short!("proposed"),), new_admin);
+        env.events()
+            .publish((symbol_short!("proposed"),), new_admin);
     }
 
     pub fn accept_admin(env: Env) {
@@ -148,7 +157,11 @@ impl InvoiceToken {
             .get(&DataKey::PendingAdmin)
             .expect("no pending admin");
         pending.require_auth();
-        let old_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let old_admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         env.storage().instance().set(&DataKey::Admin, &pending);
         env.storage().instance().remove(&DataKey::PendingAdmin);
         env.events()
@@ -182,7 +195,7 @@ impl InvoiceToken {
         }
         let end = (start + effective_limit).min(total);
         for i in start..end {
-            result.push_back(list.get(i).unwrap());
+            result.push_back(list.get(i).expect("value must exist"));
         }
         result
     }
@@ -258,9 +271,10 @@ impl InvoiceToken {
             .persistent()
             .get(&DataKey::TotalSupply(invoice_id.clone()))
             .unwrap_or(0);
-        env.storage()
-            .persistent()
-            .set(&DataKey::TotalSupply(invoice_id.clone()), &(supply + amount));
+        env.storage().persistent().set(
+            &DataKey::TotalSupply(invoice_id.clone()),
+            &(supply + amount),
+        );
         env.storage().persistent().extend_ttl(
             &DataKey::TotalSupply(invoice_id.clone()),
             THRESHOLD,
@@ -271,49 +285,66 @@ impl InvoiceToken {
     }
 
     /// Mark invoice as fully settled; equivalent to partial_settle(face_value_usd).
-    pub fn settle(env: Env) {
+    pub fn settle(env: Env, invoice_id: String) {
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
         Self::require_admin(&env);
-        let meta: InvoiceMeta = env.storage().instance().get(&DataKey::InvoiceMeta).unwrap();
-        env.storage().instance().set(&DataKey::Settled, &true);
+        let meta: InvoiceMeta = env
+            .storage()
+            .persistent()
+            .get(&DataKey::InvoiceMeta(invoice_id.clone()))
+            .expect("invoice not found");
         env.storage()
-            .instance()
-            .set(&DataKey::SettlementAmount, &meta.face_value_usd);
-        env.events().publish((symbol_short!("settled"),), ());
+            .persistent()
+            .set(&DataKey::Settled(invoice_id.clone()), &true);
+        env.storage().persistent().set(
+            &DataKey::SettlementAmount(invoice_id.clone()),
+            &meta.face_value_usd,
+        );
+        env.events()
+            .publish((symbol_short!("settled"),), invoice_id);
     }
 
     /// Mark invoice as partially settled with the given payment amount.
     /// Enables proportional redemption: each holder may redeem up to
     /// `balance * settlement_amount / total_supply` tokens.
-    pub fn partial_settle(env: Env, settlement_amount: i128) {
+    pub fn partial_settle(env: Env, invoice_id: String, settlement_amount: i128) {
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
         Self::require_admin(&env);
         if settlement_amount <= 0 {
             panic!("settlement_amount must be positive");
         }
-        let meta: InvoiceMeta = env.storage().instance().get(&DataKey::InvoiceMeta).unwrap();
+        let meta: InvoiceMeta = env
+            .storage()
+            .persistent()
+            .get(&DataKey::InvoiceMeta(invoice_id.clone()))
+            .expect("invoice not found");
         if settlement_amount > meta.face_value_usd {
             panic!("settlement_amount exceeds face value");
         }
-        env.storage().instance().set(&DataKey::Settled, &true);
         env.storage()
-            .instance()
-            .set(&DataKey::SettlementAmount, &settlement_amount);
-        env.events()
-            .publish((symbol_short!("p_settld"),), settlement_amount);
+            .persistent()
+            .set(&DataKey::Settled(invoice_id.clone()), &true);
+        env.storage().persistent().set(
+            &DataKey::SettlementAmount(invoice_id.clone()),
+            &settlement_amount,
+        );
+        env.events().publish(
+            (symbol_short!("p_settld"),),
+            (invoice_id, settlement_amount),
+        );
     }
 
-    pub fn settlement_amount(env: Env) -> i128 {
+    pub fn settlement_amount(env: Env, invoice_id: String) -> i128 {
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
         env.storage()
-            .instance()
-            .get(&DataKey::SettlementAmount)
+            .persistent()
+            .get(&DataKey::SettlementAmount(invoice_id))
             .unwrap_or(0)
     }
 
     /// Burn tokens upon settlement / redemption.
     /// Redemption is limited to the holder's proportional share of the settled amount.
-    pub fn redeem(env: Env, from: Address, amount: i128) {
+    pub fn redeem(env: Env, invoice_id: String, from: Address, amount: i128) {
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
         from.require_auth();
         if !env
@@ -331,33 +362,35 @@ impl InvoiceToken {
         }
         let settlement: i128 = env
             .storage()
-            .instance()
-            .get(&DataKey::SettlementAmount)
+            .persistent()
+            .get(&DataKey::SettlementAmount(invoice_id.clone()))
             .unwrap_or(0);
         if settlement > 0 {
-            let total_supply: i128 = env
+            let meta: InvoiceMeta = env
                 .storage()
-                .instance()
-                .get(&DataKey::TotalSupply)
-                .unwrap_or(0);
-            if total_supply > 0 {
-                let max_redeemable = bal * settlement / total_supply;
+                .persistent()
+                .get(&DataKey::InvoiceMeta(invoice_id.clone()))
+                .expect("invoice metadata must exist");
+            if meta.face_value_usd > 0 {
+                let max_redeemable = bal * settlement / meta.face_value_usd;
                 if amount > max_redeemable {
                     panic!("exceeds proportional settlement");
                 }
             }
         }
-        env.storage()
-            .persistent()
-            .set(&DataKey::Balance(from.clone()), &(bal - amount));
+        env.storage().persistent().set(
+            &DataKey::Balance(from.clone(), invoice_id.clone()),
+            &(bal - amount),
+        );
         let supply: i128 = env
             .storage()
             .persistent()
             .get(&DataKey::TotalSupply(invoice_id.clone()))
             .unwrap_or(0);
-        env.storage()
-            .persistent()
-            .set(&DataKey::TotalSupply(invoice_id.clone()), &(supply - amount));
+        env.storage().persistent().set(
+            &DataKey::TotalSupply(invoice_id.clone()),
+            &(supply - amount),
+        );
         env.storage().persistent().extend_ttl(
             &DataKey::TotalSupply(invoice_id.clone()),
             THRESHOLD,
@@ -385,9 +418,10 @@ impl InvoiceToken {
             .persistent()
             .get(&DataKey::TotalSupply(invoice_id.clone()))
             .unwrap_or(0);
-        env.storage()
-            .persistent()
-            .set(&DataKey::TotalSupply(invoice_id.clone()), &(supply - amount));
+        env.storage().persistent().set(
+            &DataKey::TotalSupply(invoice_id.clone()),
+            &(supply - amount),
+        );
         env.storage().persistent().extend_ttl(
             &DataKey::TotalSupply(invoice_id.clone()),
             THRESHOLD,
@@ -403,7 +437,8 @@ impl InvoiceToken {
         Self::require_kyc(&env, &from);
         Self::check_redeem_compliance(&env, &from, amount);
 
-        let allowance = Self::read_allowance(&env, from.clone(), spender.clone(), invoice_id.clone());
+        let allowance =
+            Self::read_allowance(&env, from.clone(), spender.clone(), invoice_id.clone());
         if allowance.amount < amount {
             panic!("insufficient allowance");
         }
@@ -432,9 +467,10 @@ impl InvoiceToken {
             .persistent()
             .get(&DataKey::TotalSupply(invoice_id.clone()))
             .unwrap_or(0);
-        env.storage()
-            .persistent()
-            .set(&DataKey::TotalSupply(invoice_id.clone()), &(supply - amount));
+        env.storage().persistent().set(
+            &DataKey::TotalSupply(invoice_id.clone()),
+            &(supply - amount),
+        );
         env.storage().persistent().extend_ttl(
             &DataKey::TotalSupply(invoice_id.clone()),
             THRESHOLD,
@@ -659,21 +695,27 @@ impl InvoiceToken {
         env.storage()
             .persistent()
             .set(&DataKey::InvoiceMeta(invoice_id.clone()), &meta);
-        env.storage()
-            .persistent()
-            .extend_ttl(&DataKey::InvoiceMeta(invoice_id.clone()), THRESHOLD, BUMP);
+        env.storage().persistent().extend_ttl(
+            &DataKey::InvoiceMeta(invoice_id.clone()),
+            THRESHOLD,
+            BUMP,
+        );
         env.storage()
             .persistent()
             .set(&DataKey::TotalSupply(invoice_id.clone()), &0i128);
-        env.storage()
-            .persistent()
-            .extend_ttl(&DataKey::TotalSupply(invoice_id.clone()), THRESHOLD, BUMP);
+        env.storage().persistent().extend_ttl(
+            &DataKey::TotalSupply(invoice_id.clone()),
+            THRESHOLD,
+            BUMP,
+        );
         env.storage()
             .persistent()
             .set(&DataKey::Settled(invoice_id.clone()), &false);
-        env.storage()
-            .persistent()
-            .extend_ttl(&DataKey::Settled(invoice_id.clone()), THRESHOLD, BUMP);
+        env.storage().persistent().extend_ttl(
+            &DataKey::Settled(invoice_id.clone()),
+            THRESHOLD,
+            BUMP,
+        );
         let mut list: Vec<String> = env
             .storage()
             .instance()
@@ -723,7 +765,7 @@ impl InvoiceToken {
             .storage()
             .instance()
             .get(&DataKey::ComplianceEngine)
-            .unwrap();
+            .expect("value must exist");
         let client = ComplianceEngineClient::new(env, &engine);
         if !client.can_transfer(from, to, &amount) {
             panic_with_error!(env, InvoiceError::TransferBlocked);
@@ -735,7 +777,7 @@ impl InvoiceToken {
             .storage()
             .instance()
             .get(&DataKey::ComplianceEngine)
-            .unwrap();
+            .expect("value must exist");
         let client = ComplianceEngineClient::new(env, &engine);
         client.register_holder(addr);
     }

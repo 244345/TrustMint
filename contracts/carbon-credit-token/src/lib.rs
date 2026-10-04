@@ -13,8 +13,8 @@ extern crate alloc;
 mod test;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, panic_with_error, symbol_short,
-    Address, Env, String, Vec,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
+    Env, String, Vec,
 };
 
 #[contracterror]
@@ -86,7 +86,7 @@ impl CarbonCreditToken {
     }
 
     fn validate_vintage_year(year: u32) {
-        if year < 1990 || year > 2050 {
+        if !(1990..=2050).contains(&year) {
             panic!("invalid vintage year");
         }
     }
@@ -131,7 +131,11 @@ impl CarbonCreditToken {
     // ── Admin ─────────────────────────────────────────────────────────────────
 
     pub fn update_kyc_registry(env: Env, new_registry: Address) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         admin.require_auth();
         env.storage()
             .instance()
@@ -141,35 +145,53 @@ impl CarbonCreditToken {
     }
 
     pub fn update_compliance_engine(env: Env, new_engine: Address) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         admin.require_auth();
         env.storage()
             .instance()
             .set(&DataKey::ComplianceEngine, &new_engine);
-        env.events()
-            .publish((symbol_short!("upd_ce"),), new_engine);
+        env.events().publish((symbol_short!("upd_ce"),), new_engine);
     }
 
     pub fn propose_admin(env: Env, new_admin: Address) {
         Self::require_admin(&env);
-        env.storage().instance().set(&DataKey::PendingAdmin, &new_admin);
-        env.events().publish((symbol_short!("proposed"),), new_admin);
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingAdmin, &new_admin);
+        env.events()
+            .publish((symbol_short!("proposed"),), new_admin);
     }
 
     pub fn accept_admin(env: Env) {
-        let pending: Address = env.storage().instance().get(&DataKey::PendingAdmin).expect("no pending admin");
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingAdmin)
+            .expect("no pending admin");
         pending.require_auth();
-        let old_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let old_admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("value must exist");
         env.storage().instance().set(&DataKey::Admin, &pending);
         env.storage().instance().remove(&DataKey::PendingAdmin);
-        env.events().publish((symbol_short!("admin_set"),), (old_admin, pending));
+        env.events()
+            .publish((symbol_short!("admin_set"),), (old_admin, pending));
     }
 
     // ── Metadata ─────────────────────────────────────────────────────────────
 
     pub fn get_meta(env: Env) -> ProjectMeta {
         env.storage().instance().extend_ttl(THRESHOLD, BUMP);
-        env.storage().instance().get(&DataKey::ProjectMeta).unwrap()
+        env.storage()
+            .instance()
+            .get(&DataKey::ProjectMeta)
+            .expect("value must exist")
     }
 
     /// Replace project metadata. Admin-only; project_id is immutable.
@@ -177,11 +199,17 @@ impl CarbonCreditToken {
         Self::require_admin(&env);
         Self::validate_project_type(&env, &new_meta.project_type);
         Self::validate_vintage_year(new_meta.vintage_year);
-        let old_meta: ProjectMeta = env.storage().instance().get(&DataKey::ProjectMeta).unwrap();
+        let old_meta: ProjectMeta = env
+            .storage()
+            .instance()
+            .get(&DataKey::ProjectMeta)
+            .expect("value must exist");
         if new_meta.project_id != old_meta.project_id {
             panic!("project_id is immutable");
         }
-        env.storage().instance().set(&DataKey::ProjectMeta, &new_meta);
+        env.storage()
+            .instance()
+            .set(&DataKey::ProjectMeta, &new_meta);
         env.events().publish((symbol_short!("upd_meta"),), ());
     }
 
@@ -347,7 +375,11 @@ impl CarbonCreditToken {
             .persistent()
             .get(&DataKey::Receipt(index))
             .expect("receipt not found");
-        let meta: ProjectMeta = env.storage().instance().get(&DataKey::ProjectMeta).unwrap();
+        let meta: ProjectMeta = env
+            .storage()
+            .instance()
+            .get(&DataKey::ProjectMeta)
+            .expect("value must exist");
 
         fn push_soroban_str(out: &mut alloc::vec::Vec<u8>, s: &String) {
             let len = s.len() as usize;
@@ -357,17 +389,31 @@ impl CarbonCreditToken {
         }
 
         fn push_u128(out: &mut alloc::vec::Vec<u8>, mut n: u128) {
-            if n == 0 { out.push(b'0'); return; }
+            if n == 0 {
+                out.push(b'0');
+                return;
+            }
             let mut buf = [0u8; 39];
             let mut pos = 39usize;
-            while n > 0 { pos -= 1; buf[pos] = b'0' + (n % 10) as u8; n /= 10; }
+            while n > 0 {
+                pos -= 1;
+                buf[pos] = b'0' + (n % 10) as u8;
+                n /= 10;
+            }
             out.extend_from_slice(&buf[pos..]);
         }
 
         fn push_i128(out: &mut alloc::vec::Vec<u8>, n: i128) {
             if n < 0 {
                 out.push(b'-');
-                push_u128(out, if n == i128::MIN { 170141183460469231731687303715884105728u128 } else { (-n) as u128 });
+                push_u128(
+                    out,
+                    if n == i128::MIN {
+                        170141183460469231731687303715884105728u128
+                    } else {
+                        (-n) as u128
+                    },
+                );
             } else {
                 push_u128(out, n as u128);
             }
